@@ -70,7 +70,7 @@ https://api.census.gov/data/key_signup.html
 Paste your key into the space below and run the function `census_api_key`
 
 ```{r}
-census_api_key("YOUR KEY GOES HERE", overwrite = TRUE)
+census_api_key("7d94a77ffab0e66527d76b9f4a8c557f41b47597", overwrite = TRUE, install = TRUE)
 ```
 
 # Load Variables
@@ -248,6 +248,9 @@ Examine each table before you do this so you can see what's about to happen... a
 
 ```{r}
 acs2020_incidents <- left_join(acs2020, tract_dumping_summary, by = "GEOID")
+glimpse(tract_dumping_summary)
+glimpse(acs2020)
+
 ```
 
 There are a bunch of NA observations in our joined data. Why?
@@ -279,6 +282,8 @@ The `st_area` function is basically "calculate geometry."
 ```{r}
 acs2020_incidents <- acs2020_incidents %>%
   mutate(area = st_area(.))
+glimpse(acs2020_incidents)
+class(acs2020_incidents$area)
 ```
 
 
@@ -302,6 +307,12 @@ Using the `mutate` command, create a column with a normalized measures of incide
 - `n_per_10k` (incidents per 10,000 people) or 
 - `n_per_sqmi` and (incidents per square mile)
 
+```{r}
+acs2020_incidents <- acs2020_incidents %>%
+  mutate(n_per_sqmi = as.numeric(n/area_sqmi))
+```
+
+
 ## Chunk 2 & 3 - Getting Some Spatial Data for Mapping
 
 Get some hydrology data from the `tigris` package to make the map so nice.
@@ -310,15 +321,54 @@ Here is how you do this - I am going to be a bit general in how I describe this,
 
 Use the `area_water` function from tigris, and request data of the class `sf` for Philadelphia county. This will call the data from the census spatial library of hydro features.
 
+```{r}
+philly_areawater <- area_water("PA", "Philadelphia", year = 2020)
+
+```
+```{r}
+st_crs(philly_areawater)
+philly_areawater <- philly_areawater %>%
+  st_transform(crs = 2272)
+```
+
+
 When you have those data, make sure they are projected to 2272 using `st_crs`, if not, st_transform them.
 
 Download the Philly Council districts using `st_read` and be ready to lay those on top.
 
-They are hosted at this URL - philly_311 <- st_read("https://raw.githubusercontent.com/mafichman/cpln_0795/main/data/philly_311.geojson")
+```{r}
+council_dist <- st_read("https://raw.githubusercontent.com/mafichman/cpln_0795/main/data/council_dist.geojson")
+```
+
+
+They are hosted at this URL - council_dist <- st_read("https://raw.githubusercontent.com/mafichman/cpln_0795/main/data/councildist.geojson")
 
 # Chunks 4 & 5
 
 Make a chloropleth map of one of the measures (See the above tab "Mapping 311" or some of yesterday's code for an example of how to do this.)
+
+ggplot()+
+  geom_sf(data = acs2020,
+          fill = "black", color = "transparent")+
+  geom_sf(data = philly_311,
+          color = "yellow", alpha = 0.2,
+          size = .5)+
+  theme_minimal()
+  
+```{r}
+ggplot()+
+  geom_sf(data = acs2020_incidents,
+          aes(fill = n))+
+  geom_sf(data = philly_areawater)+
+  geom_sf(data = council_dist, fill = "transparent", color = "white")+
+    theme_minimal()+
+  labs(
+    title = "311 Calls by Council District"
+  )+
+  scale_fill_viridis_c(option = "A")
+```
+
+
 
 Add a title, subtitle and caption (with data attribution) to the map.
 
